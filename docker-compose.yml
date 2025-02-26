@@ -1,0 +1,75 @@
+version: '3'
+services:
+  back:
+    container_name: back
+    build:
+      context: ./.docker/back
+      dockerfile: Dockerfile
+    environment:
+      LANG: 'ja_JP.UTF-8'
+      TZ: 'Asia/Tokyo'
+    networks:
+      - default
+    volumes:
+      - ./back:/usr/share/nginx/html
+    expose:
+      - 9000
+    tty: true
+    restart: always
+
+  front:
+    container_name: front
+    build:
+      context: ./.docker/front
+      dockerfile: Dockerfile
+    environment:
+      PORT: '3000'
+      HOST: '0.0.0.0'
+    ports:
+      - '3000:3000'
+      - '24678:24678'
+    expose:
+      - 3000
+    volumes:
+      - ./front:/app
+    stdin_open: true
+    tty: true
+    restart: always
+    depends_on:
+      - back
+    networks:
+      - default
+
+  nginx:
+    container_name: nginx
+    build:
+      context: ./.docker/nginx
+      dockerfile: Dockerfile
+    ports:
+      - 80:80
+    tty: true
+    volumes:
+      - ./back:/usr/share/nginx/html
+      - ./front:/app
+    depends_on:
+      - front
+
+  db:
+    platform: linux/x86_64
+    image: mysql:8.0
+    container_name: j-release-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: jiji-release
+      MYSQL_USER: jiji-release-user
+      MYSQL_PASSWORD: jiji-release-password
+      TZ: 'Asia/Tokyo'
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    # ディレクトリ同期。設定ファイルとMySQLのデータが保存される場所を同期している。コンテナは基本的に起動時に変更されてもコンテナ自体が止まるとデータが消えてしまうため、保存しておきたいものはホストマシンと同期しておく必要がある。
+    volumes:
+      - ./.docker/db/data:/var/lib/mysql
+      - ./.docker/db/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - 3307:3306
+    networks:
+      - default
